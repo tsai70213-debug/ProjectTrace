@@ -1,0 +1,9 @@
+/wiring-demo/logs/
+*.log
+*.xls
+*.xlsx
+wiring-review-backup*.json
+.env
+.env.*
+!.env.example
+/node_modules/

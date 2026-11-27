@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>備線核對台</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="vendor/xlsx.full.min.js"></script>
+  <script defer src="demo-data.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main class="operator-gate" id="operator-gate">
+    <section class="panel operator-card" aria-labelledby="operator-title">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">⎓</span>備線核對台</div>
+      <h1 id="operator-title">輸入工號</h1>
+      <p id="operator-hint">工號會記入核對紀錄與匯出的報告。</p>
+      <form id="operator-form">
+        <label class="field" for="employee-id">工號</label>
+        <input id="employee-id" name="employeeId" type="text" maxlength="40" required autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="operator-hint" autofocus>
+        <button class="button operator-submit" type="submit">進入備線核對台</button>
+      </form>
+      <details class="migration-tools" id="migration-tools" hidden>
+        <summary>移轉舊版紀錄</summary>
+        <p id="migration-hint"></p>
+        <button class="drawer-close" id="migration-action" type="button"></button>
+        <input type="file" id="migration-file" accept=".json,application/json" hidden>
+        <p id="migration-status" role="status" hidden></p>
+      </details>
+    </section>
+  </main>
+  <header class="masthead" id="dashboard-header" hidden>
+    <div class="shell">
+      <div class="topbar">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">⎓</span>備線核對台</div>
+        <div class="topbar-actions">
+          <button class="workbook-toggle" id="workbook-toggle" type="button" aria-controls="workbook-drawer" aria-expanded="false">
+            <span class="menu-icon" aria-hidden="true"></span>線表檔案
+          </button>
+          <button class="workbook-toggle" id="switch-operator" type="button">切換工號</button>
+        </div>
+      </div>
+      <div class="hero">
+        <div>
+          <p class="eyebrow">備線作業</p>
+          <h1 id="model">現場接線核對</h1>
+          <p class="project-meta"><span id="part"></span><span id="revision"></span><span id="current-operator"></span></p>
+        </div>
+        <div class="file-box">
+          <div class="file-info"><span class="file-label">來源工作簿</span><strong id="file-name"></strong></div>
+          <button class="button primary" id="import" type="button">匯入 Excel</button>
+          <input type="file" id="file" accept=".xls,.xlsx" multiple hidden>
+        </div>
+      </div>
+      <p id="message" class="message" role="status" hidden></p>
+    </div>
+  </header>
+  <main class="shell" id="dashboard" hidden>
+    <section class="overview" aria-label="核對進度">
+      <div class="metric progress-metric">
+        <span class="metric-label">全部線材</span>
+        <strong id="count-total">0</strong>
+        <progress id="progress" value="0" max="1" aria-label="已確認進度"></progress>
+        <small id="progress-label"></small>
+      </div>
+      <div class="metric"><span class="metric-label"><i class="dot pending"></i>待核對</span><strong id="count-pending">0</strong></div>
+      <div class="metric"><span class="metric-label"><i class="dot complete"></i>已確認</span><strong id="count-complete">0</strong></div>
+      <div class="metric"><span class="metric-label"><i class="dot revise"></i>需修改</span><strong id="count-revise">0</strong></div>
+    </section>
+    <div class="workspace">
+      <div class="left-column">
+        <section class="panel list-panel" aria-labelledby="list-title">
+          <div class="panel-head">
+            <div><h2 id="list-title">備線清單</h2><p id="sheet-name" class="muted"></p></div>
+            <label id="sheet-control" class="field" hidden>工作表<select id="sheet"></select></label>
+          </div>
+          <div class="toolbar">
+            <input type="search" id="search" placeholder="搜尋線名、接頭、規格…" aria-label="搜尋備線清單">
+            <select id="filter" aria-label="篩選核對狀態">
+              <option value="all">全部狀態</option>
+              <option value="pending">待核對</option>
+              <option value="complete">已確認</option>
+              <option value="revise">需修改</option>
+            </select>
+          </div>
+          <div class="table-wrap" tabindex="0" aria-label="備線清單表格">
+            <table><thead id="table-head"></thead><tbody id="table-body"></tbody></table>
+          </div>
+          <div class="list-foot list-actions">
+            <span id="row-count" aria-live="polite"></span>
+            <button class="drawer-close" id="export-report" type="button" disabled>匯出核對報告</button>
+          </div>
+        </section>
+        <section class="panel notes" id="source-notes" aria-labelledby="notes-title" hidden>
+          <h2 id="notes-title">原表備註</h2>
+          <ul id="notes-list"></ul>
+        </section>
+      </div>
+      <section class="panel inspector" aria-labelledby="detail-title">
+        <div class="panel-head">
+          <div><h2 id="detail-title">現場核對</h2><p id="detail-name" class="muted"></p></div>
+          <span id="detail-status"></span>
+        </div>
+        <p id="empty-detail" class="empty" hidden>從備線清單選擇要核對的項目。</p>
+        <form id="review" novalidate hidden>
+          <figure class="wire-diagram" id="source-main">
+            <figcaption>線材示意圖</figcaption>
+            <div class="wire-ends">
+              <section class="wire-end" aria-labelledby="wire-front-title">
+                <h3 id="wire-front-title">前端</h3>
+                <p id="wire-front-name" class="wire-end-name"></p>
+                <dl>
+                  <div><dt>前接頭</dt><dd id="wire-front-connector"></dd></div>
+                  <div><dt>剝線長</dt><dd id="wire-front-strip"></dd></div>
+                </dl>
+              </section>
+              <section class="wire-end" aria-labelledby="wire-back-title">
+                <h3 id="wire-back-title">後端</h3>
+                <p id="wire-back-name" class="wire-end-name"></p>
+                <dl>
+                  <div><dt>後接頭</dt><dd id="wire-back-connector"></dd></div>
+                  <div><dt>剝線長</dt><dd id="wire-back-strip"></dd></div>
+                </dl>
+              </section>
+            </div>
+            <div class="wire-art" aria-hidden="true"><i></i><span></span><i></i></div>
+            <dl class="wire-spec">
+              <div><dt>線材代號／規格</dt><dd id="wire-specification"></dd></div>
+              <div><dt>設計線長</dt><dd id="wire-design-length"></dd></div>
+            </dl>
+            <dl id="wire-middle" class="wire-spec" hidden></dl>
+            <p class="wire-remarks" id="wire-remarks" hidden><strong>原表接線備註</strong><span id="wire-remark-text"></span></p>
+          </figure>
+          <details class="source-details">
+            <summary>查看原表全部欄位</summary>
+            <dl id="source-all"></dl>
+          </details>
+          <div class="review-fields">
+            <h3>線長核對</h3>
+            <div class="measure-summary"><div><span>設計線長</span><strong id="reference"></strong></div><div><span>調整後線長</span><strong id="adjusted-length">—</strong></div></div>
+            <div class="field-grid">
+              <label class="field">線長調整<select name="lengthMode">
+                <option value="">待核對</option>
+                <option value="same">不需調整</option>
+                <option value="increase">需增加</option>
+                <option value="decrease">需縮短</option>
+              </select></label>
+              <label class="field" id="adjustment-field" hidden>調整量（mm）<input name="adjustment" type="number" min="0" step="any" inputmode="decimal" placeholder="輸入毫米數" aria-describedby="length-feedback"></label>
+            </div>
+            <p class="length-feedback" id="length-feedback" role="status"></p>
+            <div class="section-heading"><h3>接線內容</h3><div id="content-result" role="status"></div></div>
+            <fieldset class="content-status"><legend class="sr-only">接線內容核對結果</legend>
+              <label><input type="radio" name="content" value="pending" checked>待核對</label>
+              <label><input type="radio" name="content" value="correct">正確</label>
+              <label><input type="radio" name="content" value="wrong">有誤</label>
+            </fieldset>
+            <label class="manual"><input type="checkbox" name="revise">有其他項目需要修改</label>
+            <label class="field note-field">修改事項／現場備註<textarea name="note" rows="2" placeholder="記錄差異、修改做法或待確認事項"></textarea></label>
+          </div>
+          <div class="inspector-foot">
+            <span id="save-status" aria-live="polite"></span>
+            <span id="review-operator"></span>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+  <dialog class="workbook-drawer" id="workbook-drawer" aria-labelledby="workbook-title">
+    <nav class="workbook-nav" aria-labelledby="workbook-title">
+      <div class="panel-head">
+        <div><h2 id="workbook-title">線表檔案</h2><p id="workbook-count" class="muted"></p></div>
+        <button class="drawer-close" id="workbook-close" type="button" autofocus>收合</button>
+      </div>
+      <ul id="workbook-list" class="workbook-list"></ul>
+      <p id="workbook-empty" class="empty" hidden>請匯入 Excel 線表。</p>
+    </nav>
+  </dialog>
+</body>
+</html>
